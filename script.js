@@ -3,21 +3,23 @@ const ctx = canvas.getContext("2d");
 
 const scoreDisplay = document.getElementById("score");
 const highScoreDisplay = document.getElementById("highScore");
-const restartBtn = document.getElementById("restartBtn");
 
 const eatSound = document.getElementById("eatSound");
 const gameOverSound = document.getElementById("gameOverSound");
 
-const box = 20;
-let snake, direction, food, score, highScore, speed, game;
+const box = 40;
+let snake, direction, food, score, highScore, speed, game, gameOver;
+
 let swipeStart = null;
 
+// Initialisation du jeu
 function initGame() {
     snake = [{ x: 200, y: 200 }];
     direction = "RIGHT";
     food = spawnFood();
     score = 0;
     speed = 100;
+    gameOver = false;
     highScore = localStorage.getItem("snakeHighScore") || 0;
     scoreDisplay.textContent = "Score : " + score;
     highScoreDisplay.textContent = "High Score : " + highScore;
@@ -34,10 +36,17 @@ function spawnFood() {
     return { x, y };
 }
 
-document.addEventListener("keydown", changeDirection);
-restartBtn.addEventListener("click", initGame);
+// Contrôles clavier
+document.addEventListener("keydown", event => {
+    const key = event.key;
+    if (key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+    if (key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+    if (key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+    if (key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+    if (key === " " && gameOver) initGame(); // relancer avec espace
+});
 
-// Swipe control for mobile
+// Swipe mobile
 canvas.addEventListener("touchstart", e => {
     swipeStart = e.touches[0];
 });
@@ -56,31 +65,25 @@ canvas.addEventListener("touchend", e => {
     swipeStart = null;
 });
 
-function changeDirection(event) {
-    const key = event.key;
-    if (key === "ArrowUp" && direction !== "DOWN") direction = "UP";
-    if (key === "ArrowDown" && direction !== "UP") direction = "DOWN";
-    if (key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
-    if (key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
-}
-
+// Dessin du jeu
 function draw() {
     // fond
     ctx.fillStyle = "#111";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // serpent
-    snake.forEach((segment, i) => {
-        ctx.fillStyle = `hsl(${(score*15 + i*30) % 360}, 100%, 50%)`;
-        ctx.fillRect(segment.x, segment.y, box, box);
+    snake.forEach((seg, i) => {
+        ctx.fillStyle = `hsl(${(score*20 + i*30) % 360}, 100%, 50%)`;
+        ctx.fillRect(seg.x, seg.y, box, box);
         ctx.strokeStyle = "#000";
-        ctx.strokeRect(segment.x, segment.y, box, box);
+        ctx.strokeRect(seg.x, seg.y, box, box);
     });
 
     // nourriture
     ctx.fillStyle = `hsl(${(score*50) % 360}, 100%, 50%)`;
     ctx.fillRect(food.x, food.y, box, box);
 
+    // mouvement
     let headX = snake[0].x;
     let headY = snake[0].y;
 
@@ -89,6 +92,13 @@ function draw() {
     if (direction === "RIGHT") headX += box;
     if (direction === "DOWN") headY += box;
 
+    // **Map infinie – wrap-around**
+    if (headX >= canvas.width) headX = 0;
+    if (headX < 0) headX = canvas.width - box;
+    if (headY >= canvas.height) headY = 0;
+    if (headY < 0) headY = canvas.height - box;
+
+    // manger
     if (headX === food.x && headY === food.y) {
         score++;
         eatSound.currentTime = 0;
@@ -106,23 +116,22 @@ function draw() {
 
     const newHead = { x: headX, y: headY };
 
-    if (headX < 0 || headX >= canvas.width || headY < 0 || headY >= canvas.height || collision(newHead, snake)) {
+    // collision avec soi-même
+    if (collision(newHead, snake)) {
+        gameOver = true;
         clearInterval(game);
         gameOverSound.play();
-        alert("Game Over! Score: " + score);
-        if (score > highScore) {
-            localStorage.setItem("snakeHighScore", score);
-        }
-        return;
+        setTimeout(initGame, 1000); // relance automatique
     }
 
     snake.unshift(newHead);
     highScoreDisplay.textContent = "High Score : " + Math.max(highScore, score);
+    if (score > highScore) localStorage.setItem("snakeHighScore", score);
 }
 
-function collision(head, array) {
-    return array.some(seg => head.x === seg.x && head.y === seg.y);
+function collision(head, arr) {
+    return arr.some(seg => head.x === seg.x && head.y === seg.y);
 }
 
-// Démarrer le jeu
+// Démarrage du jeu
 initGame();
